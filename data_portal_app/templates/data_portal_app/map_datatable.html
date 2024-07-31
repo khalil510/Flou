@@ -228,7 +228,7 @@
             </div>
 
             <button class="filter-button" onclick="toggleFilterFrame()">Filter</button>
-            <button class="statistics-button" onclick="window.location.href='http://127.0.0.1:8000/data_visualization/'">Statistics</button>
+            <button class="statistics-button" onclick="window.location.href='https://flou.onrender.com/data_visualization/'">Statistics</button>
 
             <div class="filter-frame" id="filter-frame">
                 <div class="filter-frame-header">
@@ -291,7 +291,7 @@
 
         // Fetch and display the data points
         fetch("{% url 'data_records_geojson' %}")
-        .then(response => response.json())
+        .then(response => response.json())S
         .then(data => {
             L.geoJSON(data, {
                 onEachFeature: function (feature, layer) {
