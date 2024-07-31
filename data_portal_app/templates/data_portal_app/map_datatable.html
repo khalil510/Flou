@@ -291,7 +291,7 @@
 
         // Fetch and display the data points
         fetch("{% url 'data_records_geojson' %}")
-        .then(response => response.json())S
+        .then(response => response.json())
         .then(data => {
             L.geoJSON(data, {
                 onEachFeature: function (feature, layer) {
