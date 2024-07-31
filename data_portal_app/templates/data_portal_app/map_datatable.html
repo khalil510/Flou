@@ -1,0 +1,478 @@
+{% extends 'data_portal_app/base.html' %}
+{% load static %}
+
+{% block title %}Bird Flu Data Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Adjust styles for side-by-side layout */
+    #map { height: 600px; }
+
+    .legend {
+        background: white;
+        padding: 5px;
+        line-height: 1.5;
+        color: #555;
+    }
+
+    .legend i {
+        width: 10px;
+        height: 10px;
+        float: left;
+        margin-right: 4px;
+        opacity: 0.7;
+    }
+
+    /* Filter Button Styles */
+    .filter-button, .statistics-button {
+        position: absolute;
+        top: 10px;
+        z-index: 1000;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 16px;
+    }
+
+    .filter-button {
+        right: 20px;
+    }
+
+    .statistics-button {
+        left: 20px;
+    }
+
+    /* Filter Frame Styles */
+    .filter-frame {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 50%;
+        height: 60%;
+        background-color: white;
+        border: 2px solid #007bff;
+        z-index: 1001;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        overflow: auto;
+        resize: both;
+    }
+
+    .filter-frame-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .filter-frame-header h2 {
+        margin: 0;
+        font-size: 24px;
+        color: #007bff;
+    }
+
+    .close-button {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    /* Center content */
+    .filter-frame form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .filter-frame form label {
+        font-size: 18px;
+        color: #333;
+        margin-top: 10px;
+    }
+
+    .filter-frame form input {
+        margin-bottom: 10px;
+        padding: 8px;
+        width: 80%;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    .filter-frame form button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+
+    /* Summary Card Styles */
+    .summary-card {
+        background-color: #bdbdbd;
+        text-align: center;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        margin: 10px;
+        vertical-align: top;
+        max-width: 200px; /* Adjust the max-width to make the cards smaller */
+        flex: 1;
+    }
+
+    .summary-card h4 {
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 0;
+    }
+
+    .containerflex {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 50px; /* Add margin to avoid overlap with buttons */
+    }
+
+    .leaflet-control-scale {
+        left: 50% !important; /* Center horizontally */
+        transform: translateX(-50%); /* Adjust for true center */
+        bottom: 0px; /* Adjust vertical position if needed */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="containerflex">
+        <div class="col-md-3">
+            <div class="summary-card" style="background-color: #cef881;">
+                <h4>Number of Countries</h4>
+                <h3 id="num-countries">Loading...</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card" style="background-color: rgba(240, 194, 12, 0.6);">
+                <h4>Number of Regions</h4>
+                <h3 id="num-regions">Loading...</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card" style="background-color: #FFB200;">
+                <h4>HPAI Strains</h4>
+                <h3 id="num-hpai-strains">Loading...</h3>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="summary-card" style="background-color: #EB5B00;">
+                <h4>Woah Classifications</h4>
+                <h3 id="num-woah-classes">Loading...</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div id="map"></div>
+        </div>
+        <div class="col-md-6">
+            <div id="datatable-container">
+                <table id="datatable" class="display">
+                    <thead>
+                        <tr>
+                            <th>Country</th>
+                            <th>Start Date Collected</th>
+                            <th>End Date Collected</th>
+                            <th>Region</th>
+                            <th>ISO Code</th>
+                            <th>Country Code</th>
+                            <th>Latitude</th>
+                            <th>Longitude</th>
+                            <th>HPAI Strain</th>
+                            <th>WOAH Classification</th>
+                            <th>New Outbreaks</th>
+                            <th>Cumulative Outbreaks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for data in birdflu_data %}
+                        <tr data-lat="{{ data.latitude }}" data-lng="{{ data.longitude }}">
+                            <td>{{ data.country }}</td>
+                            <td>{{ data.start_date_collected }}</td>
+                            <td>{{ data.end_date_collected }}</td>
+                            <td>{{ data.region }}</td>
+                            <td>{{ data.iso_code }}</td>
+                            <td>{{ data.country_code }}</td>
+                            <td>{{ data.latitude }}</td>
+                            <td>{{ data.longitude }}</td>
+                            <td>{{ data.hpai_strain }}</td>
+                            <td>{{ data.woah_classification }}</td>
+                            <td>{{ data.new_outbreaks }}</td>
+                            <td>{{ data.cumulative_outbreaks }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="filter-button" onclick="toggleFilterFrame()">Filter</button>
+            <button class="statistics-button" onclick="window.location.href='http://127.0.0.1:8000/data_visualization/'">Statistics</button>
+
+            <div class="filter-frame" id="filter-frame">
+                <div class="filter-frame-header">
+                    <h2>Filter Data</h2>
+                    <button class="close-button" onclick="toggleFilterFrame()">Close</button>
+                </div>
+                <form id="filter-form">
+                    <label for="country">Country:</label>
+                    <input type="text" id="country" name="country"><br><br>
+                    <label for="region">Region:</label>
+                    <input type="text" id="region" name="region"><br><br>
+                    <label for="start_date">Start Date Collected:</label>
+                    <input type="date" id="start_date" name="start_date"><br><br>
+                    <label for="end_date">End Date Collected:</label>
+                    <input type="date" id="end_date" name="end_date"><br><br>
+                    <label for="hpai_strain">HPAI Strain:</label>
+                    <input type="text" id="hpai_strain" name="hpai_strain"><br><br>
+                    <button type="button" onclick="applyFilter()">Apply Filter</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+    // Define tile layers
+    var osmTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        });
+
+        var topoTileLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
+        });
+
+        var darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>'
+        });
+
+        var map = L.map('map', {
+            center: [0, 0],
+            zoom: 2,
+            layers: [osmTileLayer]  // Default layer
+        });
+
+        // Add mouse position control to the map
+        L.control.mousePosition().addTo(map);
+
+        var baseMaps = {
+            "OpenStreetMap": osmTileLayer,
+            "Topo Map": topoTileLayer,
+            "Dark Map": darkTileLayer
+        };
+
+        var markers = L.markerClusterGroup();
+        var markerMap = {};  // Dictionary to store marker references by an identifier
+
+        // Fetch and display the data points
+        fetch("{% url 'data_records_geojson' %}")
+        .then(response => response.json())
+        .then(data => {
+            L.geoJSON(data, {
+                onEachFeature: function (feature, layer) {
+                    if (feature.properties) {
+                        var popupContent = Object.keys(feature.properties).map(function (k) {
+                            return k + ": " + feature.properties[k];
+                        }).join("<br />");
+
+                        layer.bindPopup(popupContent, { maxHeight: 200 });
+
+                        // Store the marker reference in the markerMap dictionary
+                        var markerKey = feature.properties.latitude + ',' + feature.properties.longitude;
+                        markerMap[markerKey] = layer;
+                    }
+                },
+                pointToLayer: function (feature, latlng) {
+                    return markers.addLayer(L.marker(latlng));
+                }
+            });
+
+            map.addLayer(markers);
+        });
+
+        // Initialize choroplethLayer as null
+        var choroplethLayer = null;
+
+        // Fetch and display the GeoJSON boundaries with choropleth
+        fetch("{% url 'data_records_choropleth' %}")
+        .then(response => response.json())
+        .then(data => {
+            choroplethLayer = L.geoJSON(data, {
+                style: function (feature) {
+                    var hpaiCount = feature.properties.hpai_count;
+                    var fillColor = hpaiCount > 43 ? 'rgb(255,0,0)' :
+                                    hpaiCount > 40 ? 'rgb(255,20,20)' :
+                                    hpaiCount > 35 ? 'rgb(255,39,39)' :
+                                    hpaiCount > 30 ? 'rgb(255,59,59)' :
+                                    hpaiCount > 25 ? 'rgb(255,78,78)' :
+                                    hpaiCount > 20 ? 'rgb(255,98,98)' :
+                                    hpaiCount > 15 ? 'rgb(255,118,118)' :
+                                    hpaiCount > 10 ? 'rgb(255,137,137)' :
+                                    hpaiCount > 5  ? 'rgb(255,157,157)' :
+                                    hpaiCount > 0  ? 'rgb(255,216,216)' :
+                                    'rgb(0,255,0)';
+                    return {
+                        fillColor: fillColor,
+                        weight: 2,
+                        opacity: 0.7,
+                        color: 'white',
+                        dashArray: '3',
+                        fillOpacity: 0.7
+                    };
+                },
+                onEachFeature: function (feature, layer) {
+                    if (feature.properties) {
+                        layer.bindPopup('Country: ' + feature.properties.name + '<br>HPAI Count: ' + feature.properties.hpai_count);
+                    }
+                }
+            }).addTo(map);
+
+            // Add layer control to switch between cluster and choropleth
+            var overlayMaps = {
+                "Clusters": markers,
+                "Choropleth": choroplethLayer
+            };
+
+            L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+            // Create a legend and add it to the map
+            var legend = L.control({ position: 'bottomleft' });
+
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'legend');
+                var grades = [0, 5, 10, 15, 20, 25, 30, 35, 40, 43];
+                var labels = [];
+
+                div.innerHTML = '<h4>HPAI Strain Count</h4>';
+                for (var i = 0; i < grades.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                        grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+                }
+
+                return div;
+            };
+
+            legend.addTo(map);
+
+            function getColor(d) {
+                return d > 43 ? 'rgb(255,0,0)' :
+                       d > 40 ? 'rgb(255,20,20)' :
+                       d > 35 ? 'rgb(255,39,39)' :
+                       d > 30 ? 'rgb(255,59,59)' :
+                       d > 25 ? 'rgb(255,78,78)' :
+                       d > 20 ? 'rgb(255,98,98)' :
+                       d > 15 ? 'rgb(255,118,118)' :
+                       d > 10 ? 'rgb(255,137,137)' :
+                       d > 5  ? 'rgb(255,157,157)' :
+                       d > 0  ? 'rgb(255,216,216)' :
+                       'rgb(0,255,0)';
+            }
+        });
+
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        var drawControl = new L.Control.Draw({
+            edit: {
+                featureGroup: drawnItems
+            }
+        });
+
+        map.addControl(drawControl);
+    // Initialize DataTable
+    $(document).ready(function() {
+        var table = $('#datatable').DataTable();
+
+        // Summarize data and update summary cards
+        var countries = new Set();
+        var regions = new Set();
+        var hpaiStrains = new Set();
+        var woahClasses = new Set();
+
+        table.rows().every(function() {
+            var data = this.data();
+            countries.add(data[0]);
+            regions.add(data[3]);
+            hpaiStrains.add(data[8]);
+            woahClasses.add(data[9]);
+        });
+
+        document.getElementById('num-countries').textContent = countries.size;
+        document.getElementById('num-regions').textContent = regions.size;
+        document.getElementById('num-hpai-strains').textContent = hpaiStrains.size;
+        document.getElementById('num-woah-classes').textContent = woahClasses.size;
+    });
+
+    // Function to toggle the filter frame visibility
+    function toggleFilterFrame() {
+        var frame = document.getElementById('filter-frame');
+        frame.style.display = (frame.style.display === 'none' || frame.style.display === '') ? 'block' : 'none';
+    }
+
+    // Function to apply the filter
+    function applyFilter() {
+        var country = document.getElementById('country').value.toLowerCase();
+        var region = document.getElementById('region').value.toLowerCase();
+        var startDate = document.getElementById('start_date').value;
+        var endDate = document.getElementById('end_date').value;
+        var hpaiStrain = document.getElementById('hpai_strain').value.toLowerCase();
+
+        var table = $('#datatable').DataTable();
+
+        table.rows().every(function() {
+            var data = this.data();
+            var match = true;
+
+            if (country && data[0].toLowerCase().indexOf(country) === -1) {
+                match = false;
+            }
+            if (region && data[3].toLowerCase().indexOf(region) === -1) {
+                match = false;
+            }
+            if (startDate && data[1] < startDate) {
+                match = false;
+            }
+            if (endDate && data[2] > endDate) {
+                match = false;
+            }
+            if (hpaiStrain && data[8].toLowerCase().indexOf(hpaiStrain) === -1) {
+                match = false;
+            }
+
+            if (match) {
+                $(this.node()).show();
+            } else {
+                $(this.node()).hide();
+            }
+        });
+
+        toggleFilterFrame(); // Close the filter frame after applying the filter
+    }
+</script>
+{% endblock %}
